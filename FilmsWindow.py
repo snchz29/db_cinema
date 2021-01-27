@@ -56,10 +56,14 @@ class FilmsWindow(Toplevel):
         self.db.insert_film(fields.entry_name.get(), fields.entry_producer.get(), fields.entry_operator.get(),
                             fields.entry_cost.get(), fields.entry_country.get(), fields.entry_duration.get(),
                             fields.entry_picture.get())
+        genres = fields.entry_genres.get().split(", ")
+        for genre in genres:
+            print(self.cur_id, genre)
+            self.db.insert_genre(self.cur_id, genre)
         self.button_edit.config(text="Изменить", command=self.edit_film)
         self.button_drop.config(state=NORMAL)
         self.cur_id = self.db.get("films")[self.cur_index][0]
-        print("CUR:",self.cur_id)
+        print("CUR:", self.cur_id)
 
     def click_prev(self):
         self.cur_index -= 1

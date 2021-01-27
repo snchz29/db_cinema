@@ -2,6 +2,9 @@ import sqlite3
 import functools
 
 
+DATABASE_PATH = 'new_data.sqlite'
+
+
 def find_best_id(ids):
     id_ = max(ids) + 1
     for i in range(1, max(ids) + 2):
@@ -14,7 +17,7 @@ def find_best_id(ids):
 def getter(decorated):
     @functools.wraps(decorated)
     def wrapper(*args, **kwargs):
-        conn = sqlite3.connect('data.sqlite')
+        conn = sqlite3.connect(DATABASE_PATH)
         cursor = conn.cursor()
         cursor.execute(decorated(*args, **kwargs))
         res = cursor.fetchall()
@@ -23,23 +26,12 @@ def getter(decorated):
     return wrapper
 
 
-def updater_deleter(decorated):
+def worker(decorated):
     @functools.wraps(decorated)
     def wrapper(*args, **kwargs):
-        conn = sqlite3.connect('data.sqlite')
+        conn = sqlite3.connect(DATABASE_PATH)
         cursor = conn.cursor()
         cursor.execute(decorated(*args, **kwargs))
-        conn.commit()
-        conn.close()
-    return wrapper
-
-
-def inserter(decorated):
-    @functools.wraps(decorated)
-    def wrapper(self, *args, **kwargs):
-        conn = sqlite3.connect('data.sqlite')
-        cursor = conn.cursor()
-        cursor.execute(decorated(self, *args, **kwargs))
         conn.commit()
         conn.close()
     return wrapper
@@ -246,21 +238,21 @@ class DbHolder:
         return '''SELECT genre, count(film_id) FROM genres GROUP BY genre;'''
 
     @staticmethod
-    @updater_deleter
+    @worker
     def update_cinemas(cinema_id, name, address, district, is_open):
         return f'''UPDATE cinemas 
                    SET name="{name}", address="{address}", district="{district}", is_open="{is_open}"    
                    WHERE id="{cinema_id}"'''
 
     @staticmethod
-    @updater_deleter
+    @worker
     def update_session(session_id, room_id, date_time, seats):
         return f'''UPDATE sessions 
                    SET room_id="{room_id}", date_time="{date_time}", seats="{seats}" 
                    WHERE id="{session_id}"'''
 
     @staticmethod
-    @updater_deleter
+    @worker
     def update_film(film_id, name, prod=None, operator=None, cost=None, country=None, duration=None, pic=None):
         if prod is None:
             return f'''UPDATE films SET name="{name}" WHERE id="{str(film_id)}"'''
@@ -271,78 +263,66 @@ class DbHolder:
                        WHERE id="{str(film_id)}"'''
 
     @staticmethod
-    @updater_deleter
+    @worker
     def update_actor(actor_id, name, surname, birth):
         return f'''UPDATE actors 
                    SET name="{name}", surname="{surname}", birth="{birth}" 
                    WHERE id="{actor_id}"'''
 
-    @inserter
-    def insert_cinema(self, name, address, district, is_open):
-        ids = list(map(int, [i[0] for i in self.get('cinemas')]))
-        cinema_id = find_best_id(ids)
-        return f'''INSERT INTO cinemas (id, name, address, district, is_open)
-                   VALUES ("{str(cinema_id)}", "{name}", "{address}", "{district}", "{is_open}")'''
+    @staticmethod
+    @worker
+    def insert_cinema(name, address, district, is_open):
+        return f'''INSERT INTO cinemas (name, address, district, is_open)
+                   VALUES ("{name}", "{address}", "{district}", "{is_open}")'''
 
-    @inserter
-    def insert_room(self, cinema_id, number, capacity, category):
-        ids = list(map(int, [i[0] for i in self.get('rooms')]))
-        room_id = find_best_id(ids)
-        return f'''INSERT INTO rooms (id, cinema_id, number, capacity, category)
-                   VALUES ("{str(room_id)}", "{str(cinema_id)}", "{str(number)}", "{str(capacity)}", 
-                           "{str(category)}")'''
+    @staticmethod
+    @worker
+    def insert_room(cinema_id, number, capacity, category):
 
-    @inserter
-    def insert_film(self, name, prod, operator, cost, country, duration, pic):
-        ids = list(map(int, [i[0] for i in self.get('films')]))
-        film_id = find_best_id(ids)
-        return f'''INSERT INTO films (id, name, producer, operator, cost, country, duration, picture) 
-                   VALUES ("{str(film_id)}", "{name}", "{prod}", "{operator}", "{str(cost)}", "{country}",
+        return f'''INSERT INTO rooms (cinema_id, number, capacity, category)
+                   VALUES ("{str(cinema_id)}", "{str(number)}", "{str(capacity)}", "{str(category)}")'''
+
+    @staticmethod
+    @worker
+    def insert_film(name, prod, operator, cost, country, duration, pic):
+        return f'''INSERT INTO films (name, producer, operator, cost, country, duration, picture) 
+                   VALUES ("{name}", "{prod}", "{operator}", "{str(cost)}", "{country}",
                            "{str(duration)}", "{pic}")'''
 
-    @inserter
-    def insert_session(self, room_id, film_id, date_time, seats):
-        ids = list(map(int, [i[0] for i in self.get('sessions')]))
-        session_id = find_best_id(ids)
-        return f'''INSERT INTO sessions (id, room_id, film_id, date_time, seats) 
-                   VALUES ("{str(session_id)}", "{str(room_id)}", "{str(film_id)}", "{date_time}", "{str(seats)}")'''
+    @staticmethod
+    @worker
+    def insert_session(room_id, film_id, date_time, seats):
+        return f'''INSERT INTO sessions (room_id, film_id, date_time, seats) 
+                   VALUES ("{str(room_id)}", "{str(film_id)}", "{date_time}", "{str(seats)}")'''
 
-    @inserter
-    def insert_genre(self, film_id, genre):
-        ids = list(map(int, [i[0] for i in self.get('genres')]))
-        genre_id = find_best_id(ids)
-        return f'''INSERT INTO genres (id, film_id, genre) 
-                   VALUES ("{str(genre_id)}", "{str(film_id)}", "{genre}")'''
+    @staticmethod
+    @worker
+    def insert_genre(film_id, genre):
+        return f'''INSERT INTO genres (film_id, genre) 
+                   VALUES ("{str(film_id)}", "{genre}")'''
 
-    @inserter
-    def insert_role(self, film_id, name, surname, birth, role):
-        res = self.get_actor_by_name(name, surname, birth)
+    @staticmethod
+    @worker
+    def insert_role(film_id, name, surname, birth, role):
+        res = DbHolder.get_actor_by_name(name, surname, birth)
         if len(res) == 0:
-            ids = list(map(int, [i[0] for i in self.get('actors')]))
-            actor_id = find_best_id(ids)
-            self.insert_actor(name, surname, birth)
-        else:
-            actor_id = res[0][0]
-        ids = list(map(int, [i[0] for i in self.get('roles')]))
-        role_id = find_best_id(ids)
-        return f'''INSERT INTO roles (id, actor_id, film_id, role_name) 
-                   VALUES ("{str(role_id)}","{str(actor_id)}","{str(film_id)}","{role}")'''
+            DbHolder.insert_actor(name, surname, birth)
+        actor_id = DbHolder.get_actor_by_name(name, surname, birth)[0][0]
+        return f'''INSERT INTO roles (actor_id, film_id, role_name) 
+                   VALUES ("{str(actor_id)}","{str(film_id)}","{role}")'''
 
-    @inserter
-    def insert_actor(self, name, surname, birth):
-        ids = list(map(int, [i[0] for i in self.get('actors')]))
-        actor_id = find_best_id(ids)
-        return f'''INSERT INTO actors (id, name, surname, birth) 
-                   VALUES ("{str(actor_id)}","{name}","{surname}","{birth}")'''
+    @staticmethod
+    @worker
+    def insert_actor(name, surname, birth):
+        return f'''INSERT INTO actors (name, surname, birth) 
+                   VALUES ("{name}","{surname}","{birth}")'''
 
-    @inserter
-    def insert_prize(self, film_id, name, year, nomination):
-        ids = list(map(int, [i[0] for i in self.get('prizes')]))
-        prize_id = find_best_id(ids)
-        return f'''INSERT INTO prizes (id, name, year, nomination, film_id) 
-                   VALUES ("{str(prize_id)}", "{name}", "{str(year)}", "{nomination}","{str(film_id)}")'''
+    @staticmethod
+    @worker
+    def insert_prize(film_id, name, year, nomination):
+        return f'''INSERT INTO prizes (name, year, nomination, film_id) 
+                   VALUES ("{name}", "{str(year)}", "{nomination}","{str(film_id)}")'''
 
-    @inserter
     def delete_cinema(self, cinema_id):
         sessions_id = [s[0] for s in self.get_sessions_by_cinema(cinema_id)]
         self._delete_cinema_from_cinemas(cinema_id)
@@ -350,17 +330,17 @@ class DbHolder:
         self._delete_cinema_from_sessions(sessions_id)
 
     @staticmethod
-    @updater_deleter
+    @worker
     def _delete_cinema_from_cinemas(cinema_id):
         return f'''DELETE FROM cinemas WHERE id="{str(cinema_id)}"'''
 
     @staticmethod
-    @updater_deleter
+    @worker
     def _delete_cinema_from_rooms(cinema_id):
         return f'''DELETE FROM rooms WHERE cinema_id="{str(cinema_id)}"'''
 
     @staticmethod
-    @updater_deleter
+    @worker
     def _delete_cinema_from_sessions(sessions_id):
         return f'''DELETE FROM sessions WHERE id IN ({",".join(map(str, sessions_id))})'''
 
@@ -371,32 +351,32 @@ class DbHolder:
         self._delete_film_from_prizes(film_id)
 
     @staticmethod
-    @updater_deleter
+    @worker
     def _delete_film_from_films(film_id):
         return f'''DELETE FROM films WHERE id="{str(film_id)}";'''
 
     @staticmethod
-    @updater_deleter
+    @worker
     def _delete_film_from_roles(film_id):
         return f'''DELETE FROM roles WHERE film_id="{str(film_id)}";'''
 
     @staticmethod
-    @updater_deleter
+    @worker
     def _delete_film_from_prizes(film_id):
         return f'''DELETE FROM prizes WHERE film_id="{str(film_id)}"'''
 
     @staticmethod
-    @updater_deleter
+    @worker
     def delete_session(session_id):
         return f'''DELETE FROM sessions WHERE id="{str(session_id)}"'''
 
     @staticmethod
-    @updater_deleter
+    @worker
     def delete_genre(film_id):
         return f'''DELETE FROM genres WHERE film_id="{str(film_id)}"'''
 
     @staticmethod
-    @updater_deleter
+    @worker
     def delete_role(role_id):
         return f'''DELETE FROM roles WHERE id="{str(role_id)}"'''
 
@@ -405,16 +385,16 @@ class DbHolder:
         self._delete_actor_from_roles(actor_id)
 
     @staticmethod
-    @updater_deleter
+    @worker
     def _delete_actor_from_actors(actor_id):
         return f'''DELETE FROM actors WHERE id="{str(actor_id)}"'''
 
     @staticmethod
-    @updater_deleter
+    @worker
     def _delete_actor_from_roles(actor_id):
         return f'''DELETE FROM roles WHERE actor_id="{str(actor_id)}"'''
 
     @staticmethod
-    @updater_deleter
+    @worker
     def delete_prize(prize_id):
         return f'''DELETE FROM prizes WHERE id="{str(prize_id)}"'''

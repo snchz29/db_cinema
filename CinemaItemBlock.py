@@ -45,9 +45,9 @@ class CinemaItemBlock:
             return
         self.erase_fields()
         if index != len(list_cinemas):
-            self.entry_name.insert(0, list_cinemas[index][1])
-            self.entry_address.insert(0, list_cinemas[index][2])
-            self.entry_district.insert(0, list_cinemas[index][3])
+            self.entry_name.insert(0, list_cinemas[index][1].capitalize())
+            self.entry_address.insert(0, list_cinemas[index][2].capitalize())
+            self.entry_district.insert(0, list_cinemas[index][3].capitalize())
             self.entry_is_open.insert(0, list_cinemas[index][4])
 
     def erase_fields(self):
