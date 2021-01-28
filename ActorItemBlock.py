@@ -7,8 +7,8 @@ from ActorSessions import ActorSessions
 class ActorItemBlock:
     db = DbHolder()
 
-    def __init__(self, master, aid):
-        self.actor_id = aid
+    def __init__(self, master, actor):
+        self.actor = actor
         self.label_name = Label(master, text="Имя")
         self.label_surname = Label(master, text="Фамилия")
         self.label_birth = Label(master, text="Дата рождения")
@@ -16,12 +16,11 @@ class ActorItemBlock:
         self.entry_surname = Entry(master, width=30)
         self.entry_birth = Entry(master, width=30)
         self.button_films = Button(master, width=30, text="Сеансы", command=self.show_films)
-        self.index = 0
         self.pack()
-        self.update(self.index)
+        self.update(actor)
 
     def show_films(self):
-        ActorSessions(self.actor_id)
+        ActorSessions(self.actor)
 
     def pack(self):
         self.label_name.pack()
@@ -32,19 +31,12 @@ class ActorItemBlock:
         self.entry_birth.pack()
         self.button_films.pack(pady=5)
 
-    def update(self, index, actor_id=None):
-        self.index = index
-        if actor_id:
-            self.actor_id = actor_id
-        list_actors = self.db.get("actors")
-        print("Actor:", *list_actors, sep="\n")
-        if index < 0 or index > len(list_actors):
-            return
+    def update(self, actor=None):
         self.erase_fields()
-        if index != len(list_actors):
-            self.entry_name.insert(0, list_actors[index][1])
-            self.entry_surname.insert(0, list_actors[index][2])
-            self.entry_birth.insert(0, list_actors[index][3])
+        if actor:
+            self.entry_name.insert(0, actor[0])
+            self.entry_surname.insert(0, actor[1])
+            self.entry_birth.insert(0, actor[2])
 
     def erase_fields(self):
         self.entry_name.delete(0, 100)

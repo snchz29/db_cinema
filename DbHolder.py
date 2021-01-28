@@ -81,15 +81,14 @@ class DbHolder:
 
     @staticmethod
     @getter
-    def get_sessions_by_actor(actor_id):
+    def get_sessions_by_actor(actor):
         return f'''SELECT sessions.id, films.name, cinemas.name, rooms.number, date_time, seats, 
                             films.cost / 10000 * (4-rooms.category) AS cost
                    FROM sessions INNER JOIN films ON sessions.film_id = films.id
                    INNER JOIN roles ON roles.film_id = films.id
-                   INNER JOIN actors ON actors.id = roles.actor_id
                    INNER JOIN rooms ON room_id = rooms.id
                    INNER JOIN cinemas ON rooms.cinema_id = cinemas.id
-                   WHERE actors.id = "{actor_id}";'''
+                   WHERE roles.name = "{actor[0]}" AND roles.surname = "{actor[1]}" AND roles.birth = "{actor[2]}";'''
 
     @staticmethod
     @getter
@@ -117,14 +116,8 @@ class DbHolder:
 
     @staticmethod
     @getter
-    def get_films_by_id(film_ids):
-        if film_ids:
-            return f'''SELECT * FROM films 
-                       WHERE id IN ({",".join(["'" + str(i) + "'" for i in film_ids])}) OR 
-                             id IN ({",".join([str(i) for i in film_ids])}) '''
-        else:
-            return f'''SELECT * FROM films 
-                       WHERE id="{film_ids}" OR id={film_ids}'''
+    def get_films_by_id(film_id):
+        return f'''SELECT * FROM films WHERE id="{film_id}" OR id={film_id}'''
 
     @staticmethod
     @getter
@@ -153,23 +146,15 @@ class DbHolder:
 
     @staticmethod
     @getter
+    def get_actors():
+        return '''SELECT DISTINCT name, surname, birth FROM roles;'''
+
+    @staticmethod
+    @getter
     def get_actors_by_film_id(film_id):
         return f'''SELECT name, surname, role_name 
-                   FROM actors INNER JOIN roles r on actors.id = r.actor_id 
-                   WHERE r.film_id = "{str(film_id)}";'''
-
-    @staticmethod
-    @getter
-    def get_actors_by_id(actors_ids):
-        if type(actors_ids) is list:
-            return f'''SELECT * FROM actors WHERE id IN ({",".join(['"' + str(i) + '"' for i in actors_ids])})'''
-        else:
-            return f'''SELECT * FROM actors WHERE id="{str(actors_ids)}"'''
-
-    @staticmethod
-    @getter
-    def get_actor_by_name(name, surname, birth):
-        return f'''SELECT * FROM actors WHERE name="{name}" AND surname="{surname}" AND birth="{birth}"'''
+                   FROM roles
+                   WHERE film_id = "{str(film_id)}";'''
 
     @staticmethod
     @getter
@@ -264,10 +249,10 @@ class DbHolder:
 
     @staticmethod
     @worker
-    def update_actor(actor_id, name, surname, birth):
-        return f'''UPDATE actors 
+    def update_actor(old, name, surname, birth):
+        return f'''UPDATE roles 
                    SET name="{name}", surname="{surname}", birth="{birth}" 
-                   WHERE id="{actor_id}"'''
+                   WHERE name="{old[0]}" AND surname="{old[1]}" AND birth="{old[2]}"'''
 
     @staticmethod
     @worker
@@ -304,18 +289,8 @@ class DbHolder:
     @staticmethod
     @worker
     def insert_role(film_id, name, surname, birth, role):
-        res = DbHolder.get_actor_by_name(name, surname, birth)
-        if len(res) == 0:
-            DbHolder.insert_actor(name, surname, birth)
-        actor_id = DbHolder.get_actor_by_name(name, surname, birth)[0][0]
-        return f'''INSERT INTO roles (actor_id, film_id, role_name) 
-                   VALUES ("{str(actor_id)}","{str(film_id)}","{role}")'''
-
-    @staticmethod
-    @worker
-    def insert_actor(name, surname, birth):
-        return f'''INSERT INTO actors (name, surname, birth) 
-                   VALUES ("{name}","{surname}","{birth}")'''
+        return f'''INSERT INTO roles (name, surname, birth, film_id, role_name) 
+                   VALUES ("{name}", "{surname}", "{birth}", "{str(film_id)}", "{role}")'''
 
     @staticmethod
     @worker
@@ -380,19 +355,12 @@ class DbHolder:
     def delete_role(role_id):
         return f'''DELETE FROM roles WHERE id="{str(role_id)}"'''
 
-    def delete_actor(self, actor_id):
-        self._delete_actor_from_actors(actor_id)
-        self._delete_actor_from_roles(actor_id)
-
     @staticmethod
     @worker
-    def _delete_actor_from_actors(actor_id):
-        return f'''DELETE FROM actors WHERE id="{str(actor_id)}"'''
-
-    @staticmethod
-    @worker
-    def _delete_actor_from_roles(actor_id):
-        return f'''DELETE FROM roles WHERE actor_id="{str(actor_id)}"'''
+    def delete_actor(actor):
+        return f'''DELETE FROM roles WHERE name="{str(actor[0])}" AND 
+                                           surname="{str(actor[1])}" AND 
+                                           birth="{str(actor[2])}"'''
 
     @staticmethod
     @worker
